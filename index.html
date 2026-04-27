@@ -308,58 +308,12 @@ body{font-family:IBM Plex Sans,sans-serif;background:var(--bg);color:var(--text)
 #indicador-salida{font-family:IBM Plex Mono,monospace;font-size:11px;color:var(--orange);background:var(--orange-dim);border:1px solid rgba(240,165,0,.3);border-radius:5px;padding:4px 9px;display:none;}
 </style>
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA-G_Ms1fZYcQTQy0Yv3KeAb2oGJhbURy0",
-      authDomain: "previson-personal.firebaseapp.com",
-      projectId: "previson-personal",
-      storageBucket: "previson-personal.firebasestorage.app",
-      messagingSenderId: "309777696508",
-      appId: "1:309777696508:web:edb18b029a7324845ff979",
-      measurementId: "G-R1V0FY3ZY5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
-
-    // Guardar en Firestore
-    window.guardarFirebase = async function(datos) {
-      try {
-        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
-      } catch(e) { console.warn('Firebase save error:', e); }
-    };
-
-    // Escuchar cambios en tiempo real
-    onSnapshot(DOC_REF, (snap) => {
-      if(!snap.exists()) return;
-      const remoto = snap.data();
-      if(!remoto?.datos) return;
-      // Solo actualizar si el timestamp es más reciente que el nuestro
-      if(remoto.ts <= (window._lastSaveTs||0)) return;
-      try {
-        const parsed = JSON.parse(remoto.datos);
-        if(parsed.grupos) {
-          Object.assign(window.GRUPOS_DATA||{}, parsed.grupos);
-          if(typeof window.renderTramo === 'function') window.renderTramo();
-          if(typeof window.render === 'function') window.render();
-        }
-      } catch(e) { console.warn('Firebase parse error:', e); }
-    });
-
-    window._firebaseReady = true;
-    console.log('Firebase conectado ✓');
-  </script>
   <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const firebaseConfig = {
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const _fbConfig = {
       apiKey: "AIzaSyA-G_Ms1fZYcQTQyOYv3KeAb2oGJhbURy0",
       authDomain: "previson-personal.firebaseapp.com",
       projectId: "previson-personal",
@@ -367,43 +321,24 @@ body{font-family:IBM Plex Sans,sans-serif;background:var(--bg);color:var(--text)
       messagingSenderId: "309777696508",
       appId: "1:309777696508:web:edb18b029a7324845ff979"
     };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
-
-    // Guardar en Firestore
-    window.guardarFirebase = async function(datos) {
-      try {
-        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
-      } catch(e) { console.warn('Firebase save error:', e); }
+    if(!firebase.apps.length) firebase.initializeApp(_fbConfig);
+    const _db = firebase.firestore();
+    const _DOC = _db.collection('rotaciones').doc('ml2-ramal2');
+    window.guardarFirebase = async function(datos){
+      try{ await _DOC.set({datos:JSON.stringify(datos),ts:Date.now()}); }
+      catch(e){ console.warn('FB save:',e); }
     };
-
-    // Escuchar cambios en tiempo real
-    window.escucharFirebase = function(callback) {
-      return onSnapshot(DOC_REF, (snap) => {
-        if (snap.exists()) {
-          const raw = snap.data();
-          if (raw && raw.datos) {
-            try { callback(JSON.parse(raw.datos), raw.ts); }
-            catch(e) { console.warn('Firebase parse error:', e); }
-          }
-        }
+    window.escucharFirebase = function(cb){
+      return _DOC.onSnapshot(s=>{
+        if(s.exists){ try{const d=s.data(); cb(JSON.parse(d.datos),d.ts);}catch(e){} }
       });
     };
-
-    // Cargar datos iniciales
-    window.cargarFirebase = async function() {
-      try {
-        const snap = await getDoc(DOC_REF);
-        if (snap.exists() && snap.data().datos) {
-          return JSON.parse(snap.data().datos);
-        }
-      } catch(e) { console.warn('Firebase load error:', e); }
+    window.cargarFirebase = async function(){
+      try{ const s=await _DOC.get(); if(s.exists) return JSON.parse(s.data().datos); }
+      catch(e){ console.warn('FB load:',e); }
       return null;
     };
-
-    console.log('Firebase inicializado');
+    console.log('Firebase OK');
   </script>
 </head>
 <body>
@@ -1546,7 +1481,7 @@ function exportarPDFTablon(){
     @media print{body{padding:8px;}}
   </style>
   <!-- Firebase SDK -->
-  <script type="module">
+  <scr"+"ipt type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -1590,13 +1525,13 @@ function exportarPDFTablon(){
 
     window._firebaseReady = true;
     console.log('Firebase conectado ✓');
-  </script>
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  <\/script>
 
-    const firebaseConfig = {
+  <!-- Firebase -->
+  <scr"+"ipt src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"><\/script>
+  <scr"+"ipt src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"><\/script>
+  <scr"+"ipt>
+    const _fbConfig = {
       apiKey: "AIzaSyA-G_Ms1fZYcQTQyOYv3KeAb2oGJhbURy0",
       authDomain: "previson-personal.firebaseapp.com",
       projectId: "previson-personal",
@@ -1604,44 +1539,25 @@ function exportarPDFTablon(){
       messagingSenderId: "309777696508",
       appId: "1:309777696508:web:edb18b029a7324845ff979"
     };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
-
-    // Guardar en Firestore
-    window.guardarFirebase = async function(datos) {
-      try {
-        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
-      } catch(e) { console.warn('Firebase save error:', e); }
+    if(!firebase.apps.length) firebase.initializeApp(_fbConfig);
+    const _db = firebase.firestore();
+    const _DOC = _db.collection('rotaciones').doc('ml2-ramal2');
+    window.guardarFirebase = async function(datos){
+      try{ await _DOC.set({datos:JSON.stringify(datos),ts:Date.now()}); }
+      catch(e){ console.warn('FB save:',e); }
     };
-
-    // Escuchar cambios en tiempo real
-    window.escucharFirebase = function(callback) {
-      return onSnapshot(DOC_REF, (snap) => {
-        if (snap.exists()) {
-          const raw = snap.data();
-          if (raw && raw.datos) {
-            try { callback(JSON.parse(raw.datos), raw.ts); }
-            catch(e) { console.warn('Firebase parse error:', e); }
-          }
-        }
+    window.escucharFirebase = function(cb){
+      return _DOC.onSnapshot(s=>{
+        if(s.exists){ try{const d=s.data(); cb(JSON.parse(d.datos),d.ts);}catch(e){} }
       });
     };
-
-    // Cargar datos iniciales
-    window.cargarFirebase = async function() {
-      try {
-        const snap = await getDoc(DOC_REF);
-        if (snap.exists() && snap.data().datos) {
-          return JSON.parse(snap.data().datos);
-        }
-      } catch(e) { console.warn('Firebase load error:', e); }
+    window.cargarFirebase = async function(){
+      try{ const s=await _DOC.get(); if(s.exists) return JSON.parse(s.data().datos); }
+      catch(e){ console.warn('FB load:',e); }
       return null;
     };
-
-    console.log('Firebase inicializado');
-  </script>
+    console.log('Firebase OK');
+  <\/script>
 </head><body>
   <h1>Rotaciones · ML2 Ramal 2</h1>
   <div class="sub">${fechaStr}</div>`;
@@ -1665,7 +1581,7 @@ function exportarPDFTablon(){
   });
 
   html+=`<div class="footer">Generado el ${fechaStr} · /* created by jamal oufari */</div></body></html>`;
-  html=html.replace('</body>','<script>window.onload=function(){window.print();}<\/script></body>');
+  html=html.replace('</body>','<scr"+"ipt>window.onload=function(){window.print();}<\/script></body>');
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1704,7 +1620,7 @@ function exportarPDF(){
     @media print{body{padding:8px;}}
   </style>
   <!-- Firebase SDK -->
-  <script type="module">
+  <scr"+"ipt type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -1748,13 +1664,13 @@ function exportarPDF(){
 
     window._firebaseReady = true;
     console.log('Firebase conectado ✓');
-  </script>
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  <\/script>
 
-    const firebaseConfig = {
+  <!-- Firebase -->
+  <scr"+"ipt src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"><\/script>
+  <scr"+"ipt src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"><\/script>
+  <scr"+"ipt>
+    const _fbConfig = {
       apiKey: "AIzaSyA-G_Ms1fZYcQTQyOYv3KeAb2oGJhbURy0",
       authDomain: "previson-personal.firebaseapp.com",
       projectId: "previson-personal",
@@ -1762,44 +1678,25 @@ function exportarPDF(){
       messagingSenderId: "309777696508",
       appId: "1:309777696508:web:edb18b029a7324845ff979"
     };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
-
-    // Guardar en Firestore
-    window.guardarFirebase = async function(datos) {
-      try {
-        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
-      } catch(e) { console.warn('Firebase save error:', e); }
+    if(!firebase.apps.length) firebase.initializeApp(_fbConfig);
+    const _db = firebase.firestore();
+    const _DOC = _db.collection('rotaciones').doc('ml2-ramal2');
+    window.guardarFirebase = async function(datos){
+      try{ await _DOC.set({datos:JSON.stringify(datos),ts:Date.now()}); }
+      catch(e){ console.warn('FB save:',e); }
     };
-
-    // Escuchar cambios en tiempo real
-    window.escucharFirebase = function(callback) {
-      return onSnapshot(DOC_REF, (snap) => {
-        if (snap.exists()) {
-          const raw = snap.data();
-          if (raw && raw.datos) {
-            try { callback(JSON.parse(raw.datos), raw.ts); }
-            catch(e) { console.warn('Firebase parse error:', e); }
-          }
-        }
+    window.escucharFirebase = function(cb){
+      return _DOC.onSnapshot(s=>{
+        if(s.exists){ try{const d=s.data(); cb(JSON.parse(d.datos),d.ts);}catch(e){} }
       });
     };
-
-    // Cargar datos iniciales
-    window.cargarFirebase = async function() {
-      try {
-        const snap = await getDoc(DOC_REF);
-        if (snap.exists() && snap.data().datos) {
-          return JSON.parse(snap.data().datos);
-        }
-      } catch(e) { console.warn('Firebase load error:', e); }
+    window.cargarFirebase = async function(){
+      try{ const s=await _DOC.get(); if(s.exists) return JSON.parse(s.data().datos); }
+      catch(e){ console.warn('FB load:',e); }
       return null;
     };
-
-    console.log('Firebase inicializado');
-  </script>
+    console.log('Firebase OK');
+  <\/script>
 </head><body>
   <h1>Rotaciones · ML2 Ramal 2</h1>
   <div class="sub">${fechaStr}</div>`;
@@ -1829,7 +1726,7 @@ function exportarPDF(){
   });
 
   html+=`<div class="footer">Generado el ${fechaStr} · /* created by jamal oufari */</div></body></html>`;
-  html=html.replace('</body>','<script>window.onload=function(){window.print();}<\/script></body>');
+  html=html.replace('</body>','<scr"+"ipt>window.onload=function(){window.print();}<\/script></body>');
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
