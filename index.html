@@ -307,6 +307,104 @@ body{font-family:IBM Plex Sans,sans-serif;background:var(--bg);color:var(--text)
 /* INDICADOR SALIDA */
 #indicador-salida{font-family:IBM Plex Mono,monospace;font-size:11px;color:var(--orange);background:var(--orange-dim);border:1px solid rgba(240,165,0,.3);border-radius:5px;padding:4px 9px;display:none;}
 </style>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-G_Ms1fZYcQTQy0Yv3KeAb2oGJhbURy0",
+      authDomain: "previson-personal.firebaseapp.com",
+      projectId: "previson-personal",
+      storageBucket: "previson-personal.firebasestorage.app",
+      messagingSenderId: "309777696508",
+      appId: "1:309777696508:web:edb18b029a7324845ff979",
+      measurementId: "G-R1V0FY3ZY5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
+
+    // Guardar en Firestore
+    window.guardarFirebase = async function(datos) {
+      try {
+        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
+      } catch(e) { console.warn('Firebase save error:', e); }
+    };
+
+    // Escuchar cambios en tiempo real
+    onSnapshot(DOC_REF, (snap) => {
+      if(!snap.exists()) return;
+      const remoto = snap.data();
+      if(!remoto?.datos) return;
+      // Solo actualizar si el timestamp es más reciente que el nuestro
+      if(remoto.ts <= (window._lastSaveTs||0)) return;
+      try {
+        const parsed = JSON.parse(remoto.datos);
+        if(parsed.grupos) {
+          Object.assign(window.GRUPOS_DATA||{}, parsed.grupos);
+          if(typeof window.renderTramo === 'function') window.renderTramo();
+          if(typeof window.render === 'function') window.render();
+        }
+      } catch(e) { console.warn('Firebase parse error:', e); }
+    });
+
+    window._firebaseReady = true;
+    console.log('Firebase conectado ✓');
+  </script>
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-G_Ms1fZYcQTQyOYv3KeAb2oGJhbURy0",
+      authDomain: "previson-personal.firebaseapp.com",
+      projectId: "previson-personal",
+      storageBucket: "previson-personal.firebasestorage.app",
+      messagingSenderId: "309777696508",
+      appId: "1:309777696508:web:edb18b029a7324845ff979"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
+
+    // Guardar en Firestore
+    window.guardarFirebase = async function(datos) {
+      try {
+        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
+      } catch(e) { console.warn('Firebase save error:', e); }
+    };
+
+    // Escuchar cambios en tiempo real
+    window.escucharFirebase = function(callback) {
+      return onSnapshot(DOC_REF, (snap) => {
+        if (snap.exists()) {
+          const raw = snap.data();
+          if (raw && raw.datos) {
+            try { callback(JSON.parse(raw.datos), raw.ts); }
+            catch(e) { console.warn('Firebase parse error:', e); }
+          }
+        }
+      });
+    };
+
+    // Cargar datos iniciales
+    window.cargarFirebase = async function() {
+      try {
+        const snap = await getDoc(DOC_REF);
+        if (snap.exists() && snap.data().datos) {
+          return JSON.parse(snap.data().datos);
+        }
+      } catch(e) { console.warn('Firebase load error:', e); }
+      return null;
+    };
+
+    console.log('Firebase inicializado');
+  </script>
 </head>
 <body>
 <div class="shell">
@@ -640,11 +738,18 @@ const LS_KEY = 'rotaciones_ml2_multigrupo_v10';
 
 function guardar(){
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
+    const estado = {
       GRUPOS_DATA,
       gruposEnSorteo: [...gruposEnSorteo],
-      grupoActivo
-    }));
+      grupoActivo,
+      ts: Date.now()
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(estado));
+    // Guardar en Firebase (debounced 1.5s)
+    if(window.guardarFirebase){
+      clearTimeout(window._fbSaveTimer);
+      window._fbSaveTimer = setTimeout(()=>window.guardarFirebase(estado), 1500);
+    }
   } catch(e){ console.warn('Error guardando:', e); }
 }
 
@@ -1439,7 +1544,105 @@ function exportarPDFTablon(){
     .carga{font-size:9px;color:#1a5fc4;background:#dceeff;border-radius:2px;padding:1px 5px;font-weight:600;}
     .footer{margin-top:12px;font-size:9px;color:#999;text-align:right;}
     @media print{body{padding:8px;}}
-  </style></head><body>
+  </style>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-G_Ms1fZYcQTQy0Yv3KeAb2oGJhbURy0",
+      authDomain: "previson-personal.firebaseapp.com",
+      projectId: "previson-personal",
+      storageBucket: "previson-personal.firebasestorage.app",
+      messagingSenderId: "309777696508",
+      appId: "1:309777696508:web:edb18b029a7324845ff979",
+      measurementId: "G-R1V0FY3ZY5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
+
+    // Guardar en Firestore
+    window.guardarFirebase = async function(datos) {
+      try {
+        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
+      } catch(e) { console.warn('Firebase save error:', e); }
+    };
+
+    // Escuchar cambios en tiempo real
+    onSnapshot(DOC_REF, (snap) => {
+      if(!snap.exists()) return;
+      const remoto = snap.data();
+      if(!remoto?.datos) return;
+      // Solo actualizar si el timestamp es más reciente que el nuestro
+      if(remoto.ts <= (window._lastSaveTs||0)) return;
+      try {
+        const parsed = JSON.parse(remoto.datos);
+        if(parsed.grupos) {
+          Object.assign(window.GRUPOS_DATA||{}, parsed.grupos);
+          if(typeof window.renderTramo === 'function') window.renderTramo();
+          if(typeof window.render === 'function') window.render();
+        }
+      } catch(e) { console.warn('Firebase parse error:', e); }
+    });
+
+    window._firebaseReady = true;
+    console.log('Firebase conectado ✓');
+  </script>
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-G_Ms1fZYcQTQyOYv3KeAb2oGJhbURy0",
+      authDomain: "previson-personal.firebaseapp.com",
+      projectId: "previson-personal",
+      storageBucket: "previson-personal.firebasestorage.app",
+      messagingSenderId: "309777696508",
+      appId: "1:309777696508:web:edb18b029a7324845ff979"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
+
+    // Guardar en Firestore
+    window.guardarFirebase = async function(datos) {
+      try {
+        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
+      } catch(e) { console.warn('Firebase save error:', e); }
+    };
+
+    // Escuchar cambios en tiempo real
+    window.escucharFirebase = function(callback) {
+      return onSnapshot(DOC_REF, (snap) => {
+        if (snap.exists()) {
+          const raw = snap.data();
+          if (raw && raw.datos) {
+            try { callback(JSON.parse(raw.datos), raw.ts); }
+            catch(e) { console.warn('Firebase parse error:', e); }
+          }
+        }
+      });
+    };
+
+    // Cargar datos iniciales
+    window.cargarFirebase = async function() {
+      try {
+        const snap = await getDoc(DOC_REF);
+        if (snap.exists() && snap.data().datos) {
+          return JSON.parse(snap.data().datos);
+        }
+      } catch(e) { console.warn('Firebase load error:', e); }
+      return null;
+    };
+
+    console.log('Firebase inicializado');
+  </script>
+</head><body>
   <h1>Rotaciones · ML2 Ramal 2</h1>
   <div class="sub">${fechaStr}</div>`;
 
@@ -1499,7 +1702,105 @@ function exportarPDF(){
     .carga{font-size:9px;color:#1a5fc4;background:#dceeff;border-radius:2px;padding:1px 5px;font-weight:600;}
     .footer{margin-top:12px;font-size:9px;color:#999;text-align:right;}
     @media print{body{padding:8px;}}
-  </style></head><body>
+  </style>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-G_Ms1fZYcQTQy0Yv3KeAb2oGJhbURy0",
+      authDomain: "previson-personal.firebaseapp.com",
+      projectId: "previson-personal",
+      storageBucket: "previson-personal.firebasestorage.app",
+      messagingSenderId: "309777696508",
+      appId: "1:309777696508:web:edb18b029a7324845ff979",
+      measurementId: "G-R1V0FY3ZY5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
+
+    // Guardar en Firestore
+    window.guardarFirebase = async function(datos) {
+      try {
+        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
+      } catch(e) { console.warn('Firebase save error:', e); }
+    };
+
+    // Escuchar cambios en tiempo real
+    onSnapshot(DOC_REF, (snap) => {
+      if(!snap.exists()) return;
+      const remoto = snap.data();
+      if(!remoto?.datos) return;
+      // Solo actualizar si el timestamp es más reciente que el nuestro
+      if(remoto.ts <= (window._lastSaveTs||0)) return;
+      try {
+        const parsed = JSON.parse(remoto.datos);
+        if(parsed.grupos) {
+          Object.assign(window.GRUPOS_DATA||{}, parsed.grupos);
+          if(typeof window.renderTramo === 'function') window.renderTramo();
+          if(typeof window.render === 'function') window.render();
+        }
+      } catch(e) { console.warn('Firebase parse error:', e); }
+    });
+
+    window._firebaseReady = true;
+    console.log('Firebase conectado ✓');
+  </script>
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-G_Ms1fZYcQTQyOYv3KeAb2oGJhbURy0",
+      authDomain: "previson-personal.firebaseapp.com",
+      projectId: "previson-personal",
+      storageBucket: "previson-personal.firebasestorage.app",
+      messagingSenderId: "309777696508",
+      appId: "1:309777696508:web:edb18b029a7324845ff979"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_REF = doc(db, 'rotaciones', 'ml2-ramal2');
+
+    // Guardar en Firestore
+    window.guardarFirebase = async function(datos) {
+      try {
+        await setDoc(DOC_REF, { datos: JSON.stringify(datos), ts: Date.now() });
+      } catch(e) { console.warn('Firebase save error:', e); }
+    };
+
+    // Escuchar cambios en tiempo real
+    window.escucharFirebase = function(callback) {
+      return onSnapshot(DOC_REF, (snap) => {
+        if (snap.exists()) {
+          const raw = snap.data();
+          if (raw && raw.datos) {
+            try { callback(JSON.parse(raw.datos), raw.ts); }
+            catch(e) { console.warn('Firebase parse error:', e); }
+          }
+        }
+      });
+    };
+
+    // Cargar datos iniciales
+    window.cargarFirebase = async function() {
+      try {
+        const snap = await getDoc(DOC_REF);
+        if (snap.exists() && snap.data().datos) {
+          return JSON.parse(snap.data().datos);
+        }
+      } catch(e) { console.warn('Firebase load error:', e); }
+      return null;
+    };
+
+    console.log('Firebase inicializado');
+  </script>
+</head><body>
   <h1>Rotaciones · ML2 Ramal 2</h1>
   <div class="sub">${fechaStr}</div>`;
 
@@ -2969,9 +3270,53 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(turnoSel && turnoGuardado) turnoSel.value = turnoGuardado;
   cargarEstado();
   cargarConfig();
-  renderGrupoTabs();
-  cambiarGrupo(grupoActivo);
-  renderTramo();
+  // Intentar cargar desde Firebase primero
+  if(window.cargarFirebase){
+    window.cargarFirebase().then(datosFirebase => {
+      if(datosFirebase){
+        // Comparar timestamp con localStorage
+        const localRaw = localStorage.getItem(LS_KEY);
+        const localTs = localRaw ? (JSON.parse(localRaw).ts||0) : 0;
+        if(!localTs || datosFirebase.ts > localTs){
+          // Firebase más reciente — usar esos datos
+          if(datosFirebase.grupoIds) GRUPO_IDS.splice(0, GRUPO_IDS.length, ...datosFirebase.grupoIds);
+          if(datosFirebase.grupos) Object.assign(GRUPOS_DATA, datosFirebase.grupos);
+          if(datosFirebase.config) Object.assign(appConfig, datosFirebase.config);
+          if(datosFirebase.tramoConfig) Object.assign(tramoConfig, datosFirebase.tramoConfig);
+          localStorage.setItem(LS_KEY, JSON.stringify({...datosFirebase, ts: Date.now()}));
+          mostrarToast('☁️ Datos sincronizados desde Firebase');
+        }
+      }
+      renderGrupoTabs();
+      cambiarGrupo(grupoActivo);
+      renderTramo();
+    }).catch(()=>{
+      renderGrupoTabs();
+      cambiarGrupo(grupoActivo);
+      renderTramo();
+    });
+  } else {
+    renderGrupoTabs();
+    cambiarGrupo(grupoActivo);
+    renderTramo();
+  }
+  
+  // Escuchar cambios en tiempo real de otros usuarios
+  if(window.escucharFirebase){
+    window._fbListener = window.escucharFirebase((datos, ts) => {
+      const localRaw = localStorage.getItem(LS_KEY);
+      const localTs = localRaw ? (JSON.parse(localRaw).ts||0) : 0;
+      if(ts && ts > (localTs+2000)){ // Solo si es más reciente (margen 2s)
+        if(datos.grupoIds) GRUPO_IDS.splice(0, GRUPO_IDS.length, ...datos.grupoIds);
+        if(datos.grupos) Object.assign(GRUPOS_DATA, datos.grupos);
+        localStorage.setItem(LS_KEY, JSON.stringify({...datos, ts}));
+        renderGrupoTabs();
+        cambiarGrupo(grupoActivo);
+        renderTramo();
+        mostrarToast('☁️ Actualizado por otro usuario');
+      }
+    });
+  }
 });
 </script>
 </body>
