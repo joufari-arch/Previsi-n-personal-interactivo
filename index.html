@@ -680,10 +680,13 @@ function guardar(){
   };
   // Intentar localStorage (puede fallar por Tracking Prevention)
   try { localStorage.setItem(LS_KEY, JSON.stringify(estado)); } catch(e){}
-  // Firebase es la fuente principal
+  // Firebase es la fuente principal — guardar inmediatamente
   if(window.guardarFirebase){
     clearTimeout(window._fbSaveTimer);
-    window._fbSaveTimer = setTimeout(()=>window.guardarFirebase(estado), 1000);
+    window._fbSaveTimer = setTimeout(()=>{
+      console.log('Guardando en Firebase...');
+      window.guardarFirebase(estado).then(()=>console.log('Firebase OK ✓')).catch(e=>console.error('Firebase ERROR:',e));
+    }, 800);
   }
 }
 
