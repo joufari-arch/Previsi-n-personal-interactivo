@@ -672,26 +672,25 @@ const BLOQUES = [{label:'Bloque 1'},{label:'Bloque 2'},{label:'Bloque 3'},{label
 const LS_KEY = 'rotaciones_ml2_multigrupo_v10';
 
 function guardar(){
-  try {
-    const estado = {
-      GRUPOS_DATA,
-      gruposEnSorteo: [...gruposEnSorteo],
-      grupoActivo,
-      ts: Date.now()
-    };
-    localStorage.setItem(LS_KEY, JSON.stringify(estado));
-    // Guardar en Firebase (debounced 1.5s)
-    if(window.guardarFirebase){
-      clearTimeout(window._fbSaveTimer);
-      window._fbSaveTimer = setTimeout(()=>window.guardarFirebase(estado), 1500);
-    }
-  } catch(e){ console.warn('Error guardando:', e); }
+  const estado = {
+    GRUPOS_DATA,
+    gruposEnSorteo: [...gruposEnSorteo],
+    grupoActivo,
+    ts: Date.now()
+  };
+  // Intentar localStorage (puede fallar por Tracking Prevention)
+  try { localStorage.setItem(LS_KEY, JSON.stringify(estado)); } catch(e){}
+  // Firebase es la fuente principal
+  if(window.guardarFirebase){
+    clearTimeout(window._fbSaveTimer);
+    window._fbSaveTimer = setTimeout(()=>window.guardarFirebase(estado), 1000);
+  }
 }
 
 function cargarEstado(){
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if(!raw) return false;
+    if(!raw) return false; // Firebase lo cargará en el init
     const estado = JSON.parse(raw);
     if(!estado.GRUPOS_DATA) return false;
     GRUPO_IDS.forEach(gid => {
@@ -2821,8 +2820,16 @@ function papeleraDrop(e){
     const g = GRUPOS_DATA[tramoDragGid];
     const op = g.operarios.find(o=>o.id===tramoDragOpId);
     if(op && confirm(`¿Eliminar a ${op.apodo||op.nombre} del grupo?`)){
-      g.operarios = g.operarios.filter(o=>o.id!==tramoDragOpId);
-      Object.keys(g.permisos).forEach(k=>{ if(k.startsWith(tramoDragOpId+'|')) delete g.permisos[k]; });
+      const esSig = tramoConfig.semanaActual === 'siguiente';
+      if(esSig && op.vistaPreview){
+        // En previsión: eliminar solo el operario vistaPreview (no afecta semana actual)
+        g.operarios = g.operarios.filter(o=>o.id!==tramoDragOpId);
+        Object.keys(g.permisos).forEach(k=>{ if(k.startsWith(tramoDragOpId+'|')) delete g.permisos[k]; });
+      } else if(!esSig && !op.vistaPreview){
+        // En semana actual: eliminar solo si no es vistaPreview
+        g.operarios = g.operarios.filter(o=>o.id!==tramoDragOpId);
+        Object.keys(g.permisos).forEach(k=>{ if(k.startsWith(tramoDragOpId+'|')) delete g.permisos[k]; });
+      }
       renderTramo(); render(); guardar();
       mostrarToast(`🗑 ${op.apodo||op.nombre} eliminado`);
     }
@@ -3167,52 +3174,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(turnoSel && turnoGuardado) turnoSel.value = turnoGuardado;
   cargarEstado();
   cargarConfig();
-  // Intentar cargar desde Firebase primero
-  if(window.cargarFirebase){
-    window.cargarFirebase().then(datosFirebase => {
-      if(datosFirebase){
-        // Comparar timestamp con localStorage
-        const localRaw = localStorage.getItem(LS_KEY);
-        const localTs = localRaw ? (JSON.parse(localRaw).ts||0) : 0;
-        if(!localTs || datosFirebase.ts > localTs){
-          // Firebase más reciente — usar esos datos
-          if(datosFirebase.grupoIds) GRUPO_IDS.splice(0, GRUPO_IDS.length, ...datosFirebase.grupoIds);
-          if(datosFirebase.grupos) Object.assign(GRUPOS_DATA, datosFirebase.grupos);
-          if(datosFirebase.config) Object.assign(appConfig, datosFirebase.config);
-          if(datosFirebase.tramoConfig) Object.assign(tramoConfig, datosFirebase.tramoConfig);
-          localStorage.setItem(LS_KEY, JSON.stringify({...datosFirebase, ts: Date.now()}));
-          mostrarToast('☁️ Datos sincronizados desde Firebase');
-        }
-      }
-      renderGrupoTabs();
-      cambiarGrupo(grupoActivo);
-      renderTramo();
-    }).catch(()=>{
-      renderGrupoTabs();
-      cambiarGrupo(grupoActivo);
-      renderTramo();
+  // Cargar desde Firebase (fuente principal)
+  function aplicarDatos(datos){
+    if(datos.GRUPOS_DATA) Object.keys(datos.GRUPOS_DATA).forEach(gid=>{
+      if(GRUPOS_DATA[gid]) Object.assign(GRUPOS_DATA[gid], datos.GRUPOS_DATA[gid]);
     });
-  } else {
+    if(datos.gruposEnSorteo) { gruposEnSorteo.clear(); datos.gruposEnSorteo.forEach(g=>gruposEnSorteo.add(g)); }
+    if(datos.grupoActivo) grupoActivo = datos.grupoActivo;
+  }
+
+  function iniciarUI(){
     renderGrupoTabs();
     cambiarGrupo(grupoActivo);
     renderTramo();
   }
-  
-  // Escuchar cambios en tiempo real de otros usuarios
-  if(window.escucharFirebase){
-    window._fbListener = window.escucharFirebase((datos, ts) => {
-      const localRaw = localStorage.getItem(LS_KEY);
-      const localTs = localRaw ? (JSON.parse(localRaw).ts||0) : 0;
-      if(ts && ts > (localTs+2000)){ // Solo si es más reciente (margen 2s)
-        if(datos.grupoIds) GRUPO_IDS.splice(0, GRUPO_IDS.length, ...datos.grupoIds);
-        if(datos.grupos) Object.assign(GRUPOS_DATA, datos.grupos);
-        localStorage.setItem(LS_KEY, JSON.stringify({...datos, ts}));
-        renderGrupoTabs();
-        cambiarGrupo(grupoActivo);
-        renderTramo();
-        mostrarToast('☁️ Actualizado por otro usuario');
+
+  if(window.cargarFirebase){
+    window.cargarFirebase().then(datos => {
+      if(datos){ aplicarDatos(datos); mostrarToast('☁️ Datos cargados'); }
+      iniciarUI();
+      // Escuchar cambios en tiempo real
+      if(window.escucharFirebase){
+        let miUltimoTs = datos?.ts || 0;
+        window.escucharFirebase((d, ts) => {
+          if(ts && ts > miUltimoTs + 2000){
+            miUltimoTs = ts;
+            aplicarDatos(d);
+            iniciarUI();
+            mostrarToast('☁️ Actualizado');
+          }
+        });
       }
+    }).catch(e=>{
+      console.warn('Firebase error:', e);
+      iniciarUI();
     });
+  } else {
+    iniciarUI();
   }
 });
 </script>
